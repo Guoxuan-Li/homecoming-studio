@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#14101d" />
+  <meta name="description" content="一个只在浏览器本地保存照片和声音的互动场景编辑器。" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Xixi · 互动场景</title>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">✦</span><span>Xixi</span></div>
+    <div class="save-state" id="saveState" role="status">本次设置不保存</div>
+    <button class="icon-btn" id="toggleEditor" aria-label="打开或收起编辑面板" aria-expanded="true">调整</button>
+  </header>
+
+  <main class="app-shell">
+    <section class="scene-wrap" aria-label="互动场景">
+      <div class="scene" id="scene">
+        <img id="sceneBackground" class="scene-background" src="assets/hotel-window.jpg" alt="酒店落地窗夜景" draggable="false" />
+        <div id="layerCanvas" class="layer-canvas"></div>
+        <button class="hotspot welcome" id="welcomeHotspot" aria-label="播放问候">
+          <span class="hotspot-pulse"></span><span>欢迎回来</span>
+        </button>
+        <button class="hotspot water" id="waterHotspot" aria-label="播放流水声">
+          <span class="hotspot-pulse"></span><span>听水声</span>
+        </button>
+        <div class="speech-bubble show" id="speechBubble" aria-live="polite">老公你回来啦，今天辛苦啦</div>
+        <div class="scene-hint" id="sceneHint">点照片可互动 · 长按拖动</div>
+      </div>
+    </section>
+
+    <aside class="editor" id="editor" aria-label="场景编辑器">
+      <nav class="tabs" role="tablist" aria-label="编辑分类">
+        <button class="tab active" role="tab" aria-selected="true" data-tab="photos">照片</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="voice">声音</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="scene">场景</button>
+      </nav>
+
+      <div class="panel active" data-panel="photos">
+        <div class="notice direct-edit"><strong>所有调整都在这里完成</strong><br />上传、拖动、缩放、图层、透明度和删除都不需要改代码。</div>
+        <label class="upload-card" for="imageInput">
+          <span class="upload-icon">＋</span>
+          <span><strong>添加照片或 GIF</strong><small>可以一次选多张，仅保存在这台设备</small></span>
+        </label>
+        <input id="imageInput" type="file" accept="image/*,.gif" multiple hidden />
+
+        <div class="selection-empty" id="selectionEmpty">选中画面里的照片后，可以调整它。</div>
+        <div class="selection-controls" id="selectionControls" hidden>
+          <div class="control-heading"><span id="selectedName">已选照片</span><button class="danger-link" id="deleteLayer">删除</button></div>
+          <label class="range-row"><span>透明度</span><input id="opacityRange" type="range" min="10" max="100" value="100" /><output id="opacityValue">100%</output></label>
+          <div class="button-grid">
+            <button id="layerUp">上移一层</button><button id="layerDown">下移一层</button>
+            <button id="layerFront">置于顶层</button><button id="layerBack">置于底层</button>
+          </div>
+          <label class="field"><span>点一下照片时</span><select id="layerAction"><option value="none">轻轻弹一下</option><option value="speak">播放文字问候</option><option value="water">播放流水声</option><option value="audio">播放第一个自定义音频</option></select></label>
+          <button class="wide secondary" id="removeBackground">简易抠图 <small>纯色背景效果最好</small></button>
+        </div>
+      </div>
+
+      <div class="panel" data-panel="voice" hidden>
+        <label class="field"><span>要说的话</span><textarea id="speechText" rows="3">老公你回来啦，今天辛苦啦</textarea></label>
+        <div class="notice">使用设备自带语音，不模仿或冒充任何真人。不同手机可用声线会不一样。</div>
+        <label class="field"><span>设备声线</span><select id="voiceSelect"><option value="">自动选择中文男声</option></select></label>
+        <label class="range-row"><span>语速</span><input id="rateRange" type="range" min="0.6" max="1.4" step="0.05" value="0.88" /><output id="rateValue">0.88</output></label>
+        <label class="range-row"><span>音调</span><input id="pitchRange" type="range" min="0.6" max="1.4" step="0.05" value="0.92" /><output id="pitchValue">0.92</output></label>
+        <button class="wide primary" id="speakButton">试听这句话</button>
+
+        <div class="section-divider"><span>自定义音频</span></div>
+        <label class="upload-card compact" for="audioInput"><span class="upload-icon">＋</span><span><strong>添加多个音频</strong><small>MP3、M4A、WAV 等</small></span></label>
+        <input id="audioInput" type="file" accept="audio/*" multiple hidden />
+        <div class="notice audio-tip">上传后点“设为问候”，画面里的“欢迎回来”就会直接播放这段音频；未设置时才使用文字朗读。</div>
+        <div id="audioList" class="audio-list"></div>
+        <label class="switch-row"><span><strong>连续循环</strong><small>按列表顺序合并播放</small></span><input id="audioLoop" type="checkbox" /><i></i></label>
+        <div class="button-grid"><button id="playAll">播放全部</button><button id="stopAll">停止</button></div>
+      </div>
+
+      <div class="panel" data-panel="scene" hidden>
+        <div class="background-grid">
+          <button class="bg-option active" data-bg="assets/hotel-window.jpg"><img src="assets/hotel-window.jpg" alt="酒店落地窗" /><span>酒店落地窗</span></button>
+          <button class="bg-option" data-bg="assets/cozy-bedroom.jpg"><img src="assets/cozy-bedroom.jpg" alt="温馨卧室" /><span>温馨卧室</span></button>
+          <label class="bg-option custom" for="backgroundInput"><span class="upload-icon">＋</span><span>自己的背景</span></label>
+          <input id="backgroundInput" type="file" accept="image/*" hidden />
+        </div>
+        <label class="switch-row"><span><strong>显示点击提示</strong><small>欢迎回来和流水声按钮</small></span><input id="showHotspots" type="checkbox" checked /><i></i></label>
+        <label class="switch-row"><span><strong>轻柔动态</strong><small>背景呼吸和照片浮动效果</small></span><input id="motionToggle" type="checkbox" checked /><i></i></label>
+        <label class="switch-row save-choice"><span><strong>下次继续使用本次设置</strong><small>关闭时，下次打开仍显示默认页面</small></span><input id="rememberToggle" type="checkbox" /><i></i></label>
+        <button class="wide secondary" id="resetScene">恢复默认场景</button>
+        <p class="privacy-note">隐私说明：照片、GIF、音频和设置存放在当前浏览器中，不会上传到 GitHub。清除浏览器网站数据会同时清除这些内容。</p>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
