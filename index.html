@@ -7,7 +7,7 @@
   <meta name="description" content="一个只在浏览器本地保存照片和声音的互动场景编辑器。" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=effects1" />
   <title>Xixi · 互动场景</title>
 </head>
 <body>
@@ -22,6 +22,7 @@
       <div class="scene" id="scene">
         <img id="sceneBackground" class="scene-background" src="assets/hotel-window.jpg" alt="酒店落地窗夜景" draggable="false" />
         <div id="layerCanvas" class="layer-canvas"></div>
+        <div id="effectCanvas" class="effect-canvas" aria-hidden="true"></div>
         <button class="hotspot welcome" id="welcomeHotspot" aria-label="播放问候">
           <span class="hotspot-pulse"></span><span>欢迎回来</span>
         </button>
@@ -54,10 +55,20 @@
           <label class="range-row"><span>透明度</span><input id="opacityRange" type="range" min="10" max="100" value="100" /><output id="opacityValue">100%</output></label>
           <label class="range-row"><span>旋转角度</span><input id="rotationRange" type="range" min="-180" max="180" value="0" /><output id="rotationValue">0°</output></label>
           <div class="button-grid">
+            <button id="rotateLeft">向左转 15°</button><button id="rotateRight">向右转 15°</button>
+          </div>
+          <div class="button-grid">
             <button id="layerUp">上移一层</button><button id="layerDown">下移一层</button>
             <button id="layerFront">置于顶层</button><button id="layerBack">置于底层</button>
           </div>
           <label class="field"><span>点一下照片时</span><select id="layerAction"><option value="none">轻轻弹一下</option><option value="speak">播放文字问候</option><option value="water">播放流水声</option><option value="audio">播放第一个自定义音频</option></select></label>
+          <div class="section-divider"><span>点击特效</span></div>
+          <label class="field"><span>视觉效果</span><select id="layerEffect"><option value="none">无</option><option value="drops">水滴落下</option><option value="blush">局部泛红</option><option value="rub">跟随鼠标或手指揉动</option><option value="popup">显示我上传的图片</option></select></label>
+          <label class="range-row"><span>持续时间</span><input id="effectDuration" type="range" min="1" max="6" step="0.5" value="3" /><output id="effectDurationValue">3 秒</output></label>
+          <label class="upload-card compact" for="effectImageInput"><span class="upload-icon">＋</span><span><strong>上传特效图片</strong><small>点击照片后短暂显示它，支持 GIF</small></span></label>
+          <input id="effectImageInput" type="file" accept="image/*,.gif" hidden />
+          <div class="effect-image-status"><span id="effectImageName">未上传特效图片</span><button id="removeEffectImage" type="button" hidden>移除</button></div>
+          <div class="notice">“揉动”模式下，照片局部会跟随鼠标或手指；要拖动照片，先将效果改成其他选项。</div>
           <button class="wide secondary" id="removeBackground">简易抠图 <small>纯色背景效果最好</small></button>
         </div>
       </div>
@@ -97,6 +108,6 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=effects1"></script>
 </body>
 </html>

@@ -10,7 +10,7 @@
   document.title = `${siteName} · 互动场景`;
   $('.brand span:last-child').textContent = siteName;
   $('#speechBubble').textContent = greetingText;
-  const scene = $('#scene'), canvas = $('#layerCanvas'), bg = $('#sceneBackground');
+  const scene = $('#scene'), canvas = $('#layerCanvas'), effects = $('#effectCanvas'), bg = $('#sceneBackground');
   const openingLayer = { id:'default-person', staticSrc:defaultPerson, name:'默认主图', x:26, y:18, w:48, h:64, opacity:1, z:10, action:'audio' };
   const defaults = { version:5, background:defaultBackground, layers:[], audios:[], greetingAudioId:'', speechText:greetingText, voice:'', rate:.88, pitch:.92, loop:false, hotspots:true, motion:true, remember:false };
   let state = loadState(), selectedId = null, audioEl = new Audio(), playlistIndex = 0, saveTimer, bubbleTimer;
@@ -48,11 +48,13 @@
     syncControls();
   }
   function bindLayer(el, layer, handle, rotateHandle){
-    let drag=null, moved=false, gesture=null;const pointers=new Map();
+    let drag=null, moved=false, gesture=null, rub=null;const pointers=new Map();
     const angle=()=>{const p=[...pointers.values()];return Math.atan2(p[1].y-p[0].y,p[1].x-p[0].x)*180/Math.PI;};
-    el.addEventListener('pointerdown',e=>{if(e.target===handle||e.target===rotateHandle)return;e.preventDefault();select(layer.id);moved=false;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});el.setPointerCapture(e.pointerId);if(pointers.size===1){const p=pointerPct(e);drag={x:p.x-layer.x,y:p.y-layer.y};}else if(pointers.size===2){gesture={angle:angle(),rotation:layer.r||0};drag=null;moved=true;}});
-    el.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(gesture&&pointers.size>=2){layer.r=normalizeAngle(gesture.rotation+angle()-gesture.angle);el.style.transform=`rotate(${layer.r}deg)`;$('#rotationRange').value=Math.round(layer.r);$('#rotationValue').value=`${Math.round(layer.r)}°`;moved=true;return;}if(!drag)return;const p=pointerPct(e);if(Math.abs(p.x-drag.x-layer.x)>1||Math.abs(p.y-drag.y-layer.y)>1)moved=true;layer.x=clamp(p.x-drag.x,-layer.w*.7,100-layer.w*.3);layer.y=clamp(p.y-drag.y,-layer.h*.7,100-layer.h*.3);el.style.left=`${layer.x}%`;el.style.top=`${layer.y}%`;});
-    const endPointer=e=>{const had=pointers.has(e.pointerId);pointers.delete(e.pointerId);if(!had)return;if(pointers.size<2)gesture=null;if(!pointers.size){drag=null;persist();if(!moved)triggerLayer(layer,el);}};
+    function moveRub(e){if(!rub||Date.now()>rub.until)return;const r=el.getBoundingClientRect(),x=clamp(e.clientX-r.left,0,r.width),y=clamp(e.clientY-r.top,0,r.height),dx=clamp((e.clientX-rub.lastX)*.7,-16,16),dy=clamp((e.clientY-rub.lastY)*.7,-16,16);rub.lens.style.clipPath=`circle(38px at ${x}px ${y}px)`;rub.image.style.transform=`translate(${dx}px,${dy}px) scale(1.035)`;rub.lastX=e.clientX;rub.lastY=e.clientY;}
+    function startRub(e){rub?.lens.remove();const lens=document.createElement('div'),copy=$('img',el).cloneNode();lens.className='rub-lens';copy.alt='';lens.append(copy);el.append(lens);rub={lens,image:copy,lastX:e.clientX,lastY:e.clientY,until:Date.now()+effectTime(layer)};moveRub(e);const current=rub;setTimeout(()=>{current.lens.classList.add('fading');setTimeout(()=>{current.lens.remove();if(rub===current)rub=null;},420);},effectTime(layer)-420);}
+    el.addEventListener('pointerdown',e=>{if(e.target===handle||e.target===rotateHandle)return;e.preventDefault();select(layer.id);moved=false;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});el.setPointerCapture(e.pointerId);if(layer.effect==='rub'){if(pointers.size===1)startRub(e);return;}if(pointers.size===1){const p=pointerPct(e);drag={x:p.x-layer.x,y:p.y-layer.y};}else if(pointers.size===2){gesture={angle:angle(),rotation:layer.r||0};drag=null;moved=true;}});
+    el.addEventListener('pointermove',e=>{if(layer.effect==='rub'){moveRub(e);if(pointers.has(e.pointerId))moved=true;return;}if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(gesture&&pointers.size>=2){layer.r=normalizeAngle(gesture.rotation+angle()-gesture.angle);el.style.transform=`rotate(${layer.r}deg)`;$('#rotationRange').value=Math.round(layer.r);$('#rotationValue').value=`${Math.round(layer.r)}°`;moved=true;return;}if(!drag)return;const p=pointerPct(e);if(Math.abs(p.x-drag.x-layer.x)>1||Math.abs(p.y-drag.y-layer.y)>1)moved=true;layer.x=clamp(p.x-drag.x,-layer.w*.7,100-layer.w*.3);layer.y=clamp(p.y-drag.y,-layer.h*.7,100-layer.h*.3);el.style.left=`${layer.x}%`;el.style.top=`${layer.y}%`;});
+    const endPointer=e=>{const had=pointers.has(e.pointerId);pointers.delete(e.pointerId);if(!had)return;if(pointers.size<2)gesture=null;if(!pointers.size){drag=null;persist();if(!moved)triggerLayer(layer,el,e);}};
     el.addEventListener('pointerup',endPointer);el.addEventListener('pointercancel',endPointer);
     handle.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();select(layer.id);const start={x:e.clientX,w:layer.w,h:layer.h};handle.setPointerCapture(e.pointerId);handle._resize=start;});
     handle.addEventListener('pointermove',e=>{if(!handle._resize)return;const {w}=sceneSize();const nw=clamp(handle._resize.w+(e.clientX-handle._resize.x)/w*100,8,120);const ratio=layer.h/layer.w;layer.w=nw;layer.h=nw*ratio;el.style.width=`${layer.w}%`;el.style.height=`${layer.h}%`;});
@@ -68,7 +70,7 @@
   function selected(){return state.layers.find(x=>x.id===selectedId);}
   function syncControls(){
     const l=selected();$('#selectionEmpty').hidden=!!l;$('#selectionControls').hidden=!l;
-    if(l){$('#selectedName').textContent=l.name;$('#opacityRange').value=Math.round(l.opacity*100);$('#opacityValue').value=`${Math.round(l.opacity*100)}%`;$('#rotationRange').value=Math.round(l.r||0);$('#rotationValue').value=`${Math.round(l.r||0)}°`;$('#layerAction').value=l.action||'none';}
+    if(l){$('#selectedName').textContent=l.name;$('#opacityRange').value=Math.round(l.opacity*100);$('#opacityValue').value=`${Math.round(l.opacity*100)}%`;$('#rotationRange').value=Math.round(l.r||0);$('#rotationValue').value=`${Math.round(l.r||0)}°`;$('#layerAction').value=l.action||'none';$('#layerEffect').value=l.effect||'none';$('#effectDuration').value=l.effectDuration||3;$('#effectDurationValue').value=`${l.effectDuration||3} 秒`;$('#effectImageName').textContent=l.effectImageName||'未上传特效图片';$('#removeEffectImage').hidden=!l.effectImageId;}
     $('#speechText').value=state.speechText;$('#rateRange').value=state.rate;$('#rateValue').value=state.rate;$('#pitchRange').value=state.pitch;$('#pitchValue').value=state.pitch;$('#audioLoop').checked=state.loop;$('#showHotspots').checked=state.hotspots;$('#motionToggle').checked=state.motion;$('#rememberToggle').checked=state.remember;$('#saveState').textContent=state.remember?'已自动保存到本机':'未保存 · 到“场景”中开启';
     $$('.bg-option[data-bg]').forEach(x=>x.classList.toggle('active',x.dataset.bg===state.background));
   }
@@ -79,8 +81,28 @@
   function imageDims(url){return new Promise(res=>{const i=new Image();i.onload=()=>{res({w:i.naturalWidth,h:i.naturalHeight});URL.revokeObjectURL(url)};i.src=url;});}
   function nextZ(){return Math.max(0,...state.layers.map(x=>x.z))+1;}
   function reorder(mode){const l=selected();if(!l)return;const sorted=[...state.layers].sort((a,b)=>a.z-b.z);const i=sorted.findIndex(x=>x.id===l.id);if(mode==='up'&&i<sorted.length-1)[sorted[i].z,sorted[i+1].z]=[sorted[i+1].z,sorted[i].z];if(mode==='down'&&i>0)[sorted[i].z,sorted[i-1].z]=[sorted[i-1].z,sorted[i].z];if(mode==='front')l.z=Math.max(...sorted.map(x=>x.z))+1;if(mode==='back')l.z=Math.min(...sorted.map(x=>x.z))-1;persist();render();}
-  async function deleteLayer(){const l=selected();if(!l)return;state.layers=state.layers.filter(x=>x.id!==l.id);if(l.assetId){await dbDelete(l.assetId);const url=assetUrls.get(l.assetId);if(url)URL.revokeObjectURL(url);assetUrls.delete(l.assetId);}selectedId=null;persist();render();toast('照片已删除');}
-  function triggerLayer(layer,el){el.classList.remove('tap-pop');void el.offsetWidth;el.classList.add('tap-pop');if(layer.action==='speak')speak();if(layer.action==='water')playWater();if(layer.action==='audio')playWelcome();}
+  async function discardAsset(id){if(!id)return;await dbDelete(id);const url=assetUrls.get(id);if(url)URL.revokeObjectURL(url);assetUrls.delete(id);}
+  async function deleteLayer(){const l=selected();if(!l)return;state.layers=state.layers.filter(x=>x.id!==l.id);await discardAsset(l.assetId);await discardAsset(l.effectImageId);selectedId=null;persist();render();toast('照片已删除');}
+  function effectTime(layer){return Math.max(1,Math.min(6,Number(layer.effectDuration)||3))*1000;}
+  function vanish(node,ms){setTimeout(()=>{node.classList.add('fading');setTimeout(()=>node.remove(),420);},Math.max(250,ms-420));}
+  function effectPosition(event,el){const r=scene.getBoundingClientRect(),p=el.getBoundingClientRect();return{x:Math.max(0,Math.min(r.width,event?.clientX-r.left||p.left+p.width/2-r.left)),y:Math.max(0,Math.min(r.height,event?.clientY-r.top||p.top+p.height/2-r.top))};}
+  async function triggerVisual(layer,el,event){
+    const kind=layer.effect||'none';if(kind==='none'||kind==='rub')return;
+    const {x,y}=effectPosition(event,el),duration=effectTime(layer);
+    if(kind==='drops'){
+      for(let i=0;i<9;i++){const drop=document.createElement('span');drop.className='effect-drop';drop.style.left=`${x+(i-4)*15+(Math.random()-.5)*14}px`;drop.style.top=`${Math.max(-20,y-90-Math.random()*70)}px`;drop.style.setProperty('--fall',`${90+Math.random()*70}px`);drop.style.setProperty('--drop-time',`${Math.max(1,duration/1000-.7)}s`);drop.style.animationDelay=`${i*85}ms`;effects.append(drop);setTimeout(()=>drop.remove(),duration+800);}
+      return;
+    }
+    if(kind==='blush'){
+      const r=el.getBoundingClientRect(),spot=document.createElement('span');spot.className='effect-blush';spot.style.left=`${clamp((event?.clientX??r.left+r.width/2)-r.left,0,r.width)}px`;spot.style.top=`${clamp((event?.clientY??r.top+r.height/2)-r.top,0,r.height)}px`;el.append(spot);vanish(spot,duration);return;
+    }
+    if(kind==='popup'){
+      if(!layer.effectImageId){toast('请先为这张照片上传特效图片');return;}
+      const src=await assetUrl(layer.effectImageId);if(!src)return;
+      const image=document.createElement('img');image.className='effect-popup';image.alt='点击特效';image.src=src;image.style.left=`${x}px`;image.style.top=`${y}px`;effects.append(image);vanish(image,duration);
+    }
+  }
+  function triggerLayer(layer,el,event){el.classList.remove('tap-pop');void el.offsetWidth;el.classList.add('tap-pop');triggerVisual(layer,el,event);if(layer.action==='speak')speak();if(layer.action==='water')playWater();if(layer.action==='audio')playWelcome();}
 
   function loadVoices(){const voices=speechSynthesis.getVoices();const select=$('#voiceSelect'),old=state.voice;select.innerHTML='<option value="">自动选择中文男声</option>';voices.filter(v=>/^zh/i.test(v.lang)).forEach(v=>{const o=document.createElement('option');o.value=v.name;o.textContent=`${v.name} · ${v.lang}`;select.append(o)});select.value=old;}
   function speak(){if(!('speechSynthesis'in window)){toast('当前浏览器不支持文字朗读');return;}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(state.speechText.trim()||defaults.speechText);const voices=speechSynthesis.getVoices();u.voice=voices.find(v=>v.name===state.voice)||voices.find(v=>/^zh/i.test(v.lang)&&/male|yunxi|yunjian|kangkang|male/i.test(v.name))||voices.find(v=>/^zh/i.test(v.lang))||null;u.lang='zh-CN';u.rate=state.rate;u.pitch=state.pitch;speechSynthesis.speak(u);showBubble(u.text);}
@@ -102,7 +124,7 @@
   }
 
   async function setBackground(src){state.background=src;persist();await render();}
-  async function reset(){stopAudio();const remember=state.remember;for(const x of [...state.layers,...state.audios])if(x.assetId||!x.staticSrc)await dbDelete(x.assetId||x.id);await dbDelete('custom-bg');state=freshState();state.remember=remember;selectedId=null;persist();render();renderAudioList();toast('已恢复默认场景');}
+  async function reset(){stopAudio();const remember=state.remember;for(const x of state.layers){await discardAsset(x.assetId);await discardAsset(x.effectImageId);}for(const x of state.audios)await discardAsset(x.id);await discardAsset('custom-bg');effects.replaceChildren();state=freshState();state.remember=remember;selectedId=null;persist();render();renderAudioList();toast('已恢复默认场景');}
 
   $$('.tab').forEach(tab=>tab.onclick=()=>{$$('.tab').forEach(x=>{const on=x===tab;x.classList.toggle('active',on);x.setAttribute('aria-selected',on)});$$('.panel').forEach(p=>{const on=p.dataset.panel===tab.dataset.tab;p.classList.toggle('active',on);p.hidden=!on})});
   $('#toggleEditor').onclick=()=>{const e=$('#editor');e.classList.toggle('collapsed');$('#toggleEditor').setAttribute('aria-expanded',!e.classList.contains('collapsed'))};
@@ -115,6 +137,10 @@
   function rotateSelected(delta){const l=selected();if(!l)return;l.r=normalizeAngle((l.r||0)+delta);$('#rotationRange').value=Math.round(l.r);$('#rotationValue').value=`${Math.round(l.r)}°`;const el=$(`.photo-layer[data-id="${l.id}"]`);if(el)el.style.transform=`rotate(${l.r}deg)`;persist();}
   $('#rotateLeft').onclick=()=>rotateSelected(-15);$('#rotateRight').onclick=()=>rotateSelected(15);
   $('#layerAction').onchange=e=>{const l=selected();if(l){l.action=e.target.value;persist()}};
+  $('#layerEffect').onchange=e=>{const l=selected();if(l){l.effect=e.target.value;persist();toast(l.effect==='rub'?'在照片上移动鼠标或手指，局部会跟随移动':'点击照片即可预览特效')}};
+  $('#effectDuration').oninput=e=>{const l=selected();if(!l)return;l.effectDuration=+e.target.value;$('#effectDurationValue').value=`${l.effectDuration} 秒`;persist()};
+  $('#effectImageInput').onchange=async e=>{const l=selected(),file=e.target.files[0];e.target.value='';if(!l||!file)return;if(!file.type.startsWith('image/')){toast('请选择图片或 GIF');return;}await discardAsset(l.effectImageId);const id=uid('effect');await dbPut({id,blob:file,name:file.name,type:file.type});l.effectImageId=id;l.effectImageName=file.name;l.effect='popup';persist();syncControls();toast('已添加点击后显示的图片')};
+  $('#removeEffectImage').onclick=async()=>{const l=selected();if(!l)return;await discardAsset(l.effectImageId);l.effectImageId='';l.effectImageName='';if(l.effect==='popup')l.effect='none';persist();syncControls();toast('特效图片已移除')};
   $('#deleteLayer').onclick=deleteLayer;$('#layerUp').onclick=()=>reorder('up');$('#layerDown').onclick=()=>reorder('down');$('#layerFront').onclick=()=>reorder('front');$('#layerBack').onclick=()=>reorder('back');$('#removeBackground').onclick=simpleCutout;
   $('#speechText').oninput=e=>{state.speechText=e.target.value;persist()};$('#voiceSelect').onchange=e=>{state.voice=e.target.value;persist()};
   $('#rateRange').oninput=e=>{state.rate=+e.target.value;$('#rateValue').value=state.rate;persist()};$('#pitchRange').oninput=e=>{state.pitch=+e.target.value;$('#pitchValue').value=state.pitch;persist()};
