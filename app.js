@@ -150,5 +150,5 @@
   $('#rememberToggle').onchange=e=>{state.remember=e.target.checked;persist();toast(state.remember?'以后会在这台设备继续使用本次设置':'本次设置不保存，下次显示默认页面')};
   scene.addEventListener('pointerdown',e=>{if(e.target===scene||e.target===bg||e.target===canvas){selectedId=null;render()}});
   speechSynthesis.onvoiceschanged=loadVoices;loadVoices();render();renderAudioList();
-  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});
 })();
